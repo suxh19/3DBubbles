@@ -3,6 +3,8 @@
 
 A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the MIT protocol provides high-precision bubble flow 3D and 2D data and statistical information. The data come from high spatial resolution X-ray CT measurement equipment scanning static gas-liquid flow field model data.
 
+数据集链接：https://www.kaggle.com/datasets/mujishan/3dbubbles
+
 ## 文件结构：  
 3DBubbles  
 > | ---- parameters.csv 3D气泡和2D投影图像的结构参数及几何信息  
