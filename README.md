@@ -11,7 +11,8 @@ A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the
 > | ---- 00001.stl  
 > | ---- 00002.stl  
 > | ---- ……  
-> \\ ---- 10823.stl  
+> \\ ---- 10823.stl
+
 | ---- projection 10823×26个投影图像  
 > | ---- 00001  
 >> | ---- Sphere_0.00_0.00_1.00_scale=39.png  
@@ -20,7 +21,8 @@ A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the
 >> \\ ---- Sphere_-1.00_0.00_0.00_scale=39.png  
 > | ---- 00002  
 > | ---- ……  
-> \\ ---- 10823  
+> \\ ---- 10823
+
 \\ ---- SH_coefficient 10823×26个投影图像  
 > | ---- 00001  
 >> | ---- N=1.npy  
