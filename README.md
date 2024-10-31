@@ -18,7 +18,8 @@ A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the
 >> | ---- Sphere_0.00_0.00_1.00_scale=39.png  
 >> | ---- Sphere_0.00_0.00_-1.00_scale=39.png  
 >> | ---- ……  
->> \\ ---- Sphere_-1.00_0.00_0.00_scale=39.png  
+>> \\ ---- Sphere_-1.00_0.00_0.00_scale=39.png
+> 
 > | ---- 00002  
 > | ---- ……  
 > \\ ---- 10823
@@ -28,7 +29,8 @@ A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the
 >> | ---- N=1.npy  
 >> | ---- N=2.npy  
 >> | ---- ……  
->> \\ ---- N=20.npy  
+>> \\ ---- N=20.npy
+> 
 > | ---- 00002  
 > | ---- ……  
 > \\ ---- 10823  
