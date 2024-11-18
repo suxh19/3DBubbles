@@ -42,15 +42,15 @@ A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the
 
 ## 更新日志
 
-### 3DBubbles Beta1.3.0
+### 3DBubbles 0.5.0-Beta5
 2024年11月19日更新
 
 1. 更新FlowRenderer_1118.py,从3DBubbles随机选取单气泡生成气泡流场，并进行四个角度的气泡点云光栅化渲染。
 
-2. 新增3Dbubbleflowrender，提供了一个气含率为2%的三维气泡流场Demo。
+2. 新增3Dbubbleflowrender，提供了一个气含率为2%的三维气泡流场Demo。包括：1️⃣三维静态结构（气含率2%，mesh信息，STL格式）；2️⃣二维图像（4个角度的虚拟投影）；3️⃣全部气泡的边界框（bounding box）和类别（class）；4️⃣全部气泡的掩码（mask）信息。
 
 
-### 3DBubbles Beta1.3.0
+### 3DBubbles 0.4.0-Beta4
 2024年10月31日更新
 
 更新重建指标（reconstruction_index.csv）。
@@ -84,17 +84,17 @@ A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the
 
 第20-25列：第14-19列参数的相对误差。
 
-### 3DBubbles Beta1.2.0
+### 3DBubbles 0.3.0-beta3
 2024年10月22日更新
 1. 更新球谐系数。SH_coefficient文件夹中存放10823个用于重建气泡三维结构的npy文件，重建degree从1到20。
 2. 更新重建指标（reconstruction_index.csv），包括：原始点云中点的数量和所占字节数，每个点有(x,y,z)三个点坐标，格式为float64，每个点占用3×4=12byte；球谐重建的degree：N，从1到20，共20列。
 
-### 3DBubbles Beta1.1.0
+### 3DBubbles 0.2.0-beta2
 2024年10月17日更新
 1. 整合同类型文件到同一个文件夹中。
 2. 删除异常气泡及对应投影图像和参数。
 
-### 3DBubbles Beta1.0.0
+### 3DBubbles 0.1.0-beta1
 2024年10月9日更新
 
 更新以下数据：
@@ -105,11 +105,9 @@ A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the
 ## Coming soon
 
 ### 气泡流
-1. 三维静态结构（气含率0.5%、1%、2%，mesh信息，STL格式）
-2. 二维图像（4个角度的虚拟投影）
-3. 气泡流统计信息（气泡尺寸分布BSD，气泡角度分布BRD，气泡位置分布BPD等）
-4. 全部气泡的边界框（bounding box）和类别（class）
-5. 全部气泡的掩码（mask）信息
+1. 0.5%、1%、2%等不同气含率的三维气泡流场（mesh信息，STL格式）；
+2. 气泡流统计信息（气泡尺寸分布BSD，气泡角度分布BRD，气泡位置分布BPD等）；
+3. 增加更多约束条件。
 
 
 ## 联系
