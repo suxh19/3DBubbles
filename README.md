@@ -41,6 +41,15 @@ A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the
 >> \\ ---- 10823  
 
 ## 更新日志
+
+### 3DBubbles Beta1.3.0
+2024年11月19日更新
+
+1. 更新FlowRenderer_1118.py,从3DBubbles随机选取单气泡生成气泡流场，并进行四个角度的气泡点云光栅化渲染。
+
+2. 新增3Dbubbleflowrender，提供了一个气含率为2%的三维气泡流场Demo。
+
+
 ### 3DBubbles Beta1.3.0
 2024年10月31日更新
 
