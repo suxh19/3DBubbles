@@ -3,42 +3,34 @@ import os
 import random
 import cv2
 from datetime import datetime
-# from PIL import Image
 import pyvista as pv
 import matplotlib.pyplot as plt
 import numpy as np
-# import vtk
 from scipy.ndimage import median_filter, gaussian_filter
-# from tqdm import tqdm
-# from tqdm.contrib import tzip
-# from scipy.spatial import distance_matrix
 import csv
-# from stl import mesh
-import matplotlib.pyplot as plt
-# from mpl_toolkits.mplot3d import Axes3D
 import shutil
 from pyinstrument import Profiler
 import multiprocessing as mp
+import argparse
 
-def upsample_and_scale_mesh(stl_files, num_clusters, chosen_volume):
+def upsample_and_scale_mesh(stl_files, num_clusters, chosen_volume, sample_spacing):
     stl_file = random.choice(stl_files)
     mesh_origin = pv.read(stl_file)
-    # if mesh.points.shape[0] < 15000:
-    mesh = upsample_point_cloud(mesh_origin.points, num_clusters)
-    mesh.smooth_taubin(n_iter=10, pass_band=5, inplace = True)
+    mesh = upsample_point_cloud(mesh_origin.points, num_clusters, sample_spacing)
+    mesh.smooth_taubin(n_iter=10, pass_band=5, inplace=True)
     mesh = mesh.fill_holes(100)
     volume = mesh.volume
     scale_factor = (chosen_volume / volume) ** (1/3)
     mesh.points *= scale_factor
     mesh_origin.points *= scale_factor
     return stl_file, mesh, mesh_origin, chosen_volume
+
 def generate_uniform_points_on_sphere(N=1000):
     phi = (np.sqrt(5) - 1) / 2
     n = np.arange(0, N)
     z = ((2*n + 1) / N - 1)
     x = (np.sqrt(1 - z**2)) * np.cos(2 * np.pi * (n + 1) * phi)
     y = (np.sqrt(1 - z**2)) * np.sin(2 * np.pi * (n + 1) * phi)
-
     points = np.stack([x, y, z], axis=-1)
     return points
 
@@ -47,12 +39,11 @@ def cv2_enhance_contrast(img, factor):
     img_deg = np.ones_like(img) * mean
     return cv2.addWeighted(img, factor, img_deg, 1-factor, 0.0)
 
-def upsample_point_cloud(points, num_clusters):
+def upsample_point_cloud(points, num_clusters, sample_spacing):
     cloud = pv.PolyData(points)
     sample_spacing = 0.1
-    while(1):
-        mesh = cloud.reconstruct_surface(nbr_sz = 10, sample_spacing = sample_spacing)
-        # 提取顶点作为新的点云
+    while True:
+        mesh = cloud.reconstruct_surface(nbr_sz=10, sample_spacing=sample_spacing)
         new_points = np.asarray(mesh.points)
         if new_points.shape[0] < num_clusters * 1.1:
             sample_spacing *= 0.8
@@ -60,52 +51,29 @@ def upsample_point_cloud(points, num_clusters):
             break
     return mesh
 
-def generate_points_in_cube(num_points, weights, cube_size=np.array([100,100,100]), num = 50):
+def generate_points_in_cube(num_points, cube_size=np.array([100,100,100]), num=100, poisson_max_iter = 100000):
     rnd_points = []
+    Look_up_num = 0
     while len(rnd_points) < num_points:
+        if Look_up_num >= poisson_max_iter:
+            raise RuntimeError("超过最大迭代次数，可能无法在给定条件下生成足够的点")
         x, y, z = np.random.rand(3) * cube_size
         if all(np.linalg.norm(np.array([x, y, z]) - p) > (cube_size.min() / (num**(1/3)) * 0.5) for p in rnd_points)\
                 and np.linalg.norm(np.array([x, y]) - cube_size[:2]/2) < cube_size[0]/2*0.85:
             rnd_points.append([x, y, z])
+        Look_up_num += 1
     return np.array(rnd_points)
 
-def process_projection(args):
-    i_projection, point_fibonacci, allocated_meshes, allocated_origin_meshes, base_path, gas_ratio, v, scale = args
-
-    masks_path = os.path.join(base_path, f'{str(i_projection).zfill(3)}/masks')
-    if not os.path.exists(masks_path):
-        os.makedirs(masks_path)
-    # rot = mesh.rotate_vector(np.cross(point_fibonacci, v), np.arccos(np.dot(point_fibonacci, v)) * 180 / np.pi, inplace=False)
-    meshes = [mesh.rotate_vector(np.cross(point_fibonacci, v), np.arccos(np.dot(point_fibonacci, v)) * 180 / np.pi, inplace=False) for mesh in allocated_meshes]
-    meshes_origin = [mesh.rotate_vector(np.cross(point_fibonacci, v), np.arccos(np.dot(point_fibonacci, v)) * 180 / np.pi, inplace=False) for mesh in allocated_origin_meshes]
-    mesh_fibonacci = pv.merge([mesh for mesh in meshes_origin])
-    mesh_fibonacci.save(os.path.join(base_path, f'{str(i_projection).zfill(3)}/{gas_ratio}_fibonacci.stl'))
-
-    all_points = [mesh.points for mesh in meshes]
-    all_vectors = [mesh.point_normals for mesh in meshes]
-    volume_size_x = max([np.max(point[:, 0]) for point in all_points]) - min([np.min(point[:, 0]) for point in all_points])
-    volume_size_y = max([np.max(point[:, 1]) for point in all_points]) - min([np.min(point[:, 1]) for point in all_points])
-    canvas_range_x = int(scale * volume_size_x)
-    canvas_range_y = int(scale * volume_size_y)
-    mapped_points = np.ones((canvas_range_x, canvas_range_y))
-
-    # Sort all_points and all_vectors based on the maximum value of the last column of each array in all_points
-    sorted_indices = np.argsort([np.max(point[:, 2]) for point in all_points])[::-1]
-    all_points = [all_points[i] for i in sorted_indices]
-    all_vectors = [all_vectors[i] for i in sorted_indices]
-
-    min_x, max_x = np.min([np.min(point[:, 0]) for point in all_points]), np.max([np.max(point[:, 0]) for point in all_points])
-    min_y, max_y = np.min([np.min(point[:, 1]) for point in all_points]), np.max([np.max(point[:, 1]) for point in all_points])
-
+def pixel_coloring(masks_path, alpha, all_points, all_vectors, min_x, min_y, scale, canvas_range_x, canvas_range_y):
     bboxes = []
     bub_conts = []
+    mapped_points = np.ones((canvas_range_x, canvas_range_y))
     for points, vectors in zip(all_points, all_vectors):      # 每一个points都是一个气泡
-        # 舍弃z<0
         mask = vectors[:, 2] > -99099999
         filtered_points = points[mask]
         filtered_normals = vectors[mask]
         angles = filtered_normals[:, 2] / np.linalg.norm(filtered_normals, axis=1)
-        M = angles ** 4
+        M = angles ** alpha
         min_mapped_x, max_mapped_x, min_mapped_y, max_mapped_y = float('inf'), float('-inf'), float('inf'), float('-inf')
         for i in range(filtered_points.shape[0]):
             mapped_x, mapped_y = (filtered_points[i, 0] - min_x) * scale, (filtered_points[i, 1] - min_y) * scale
@@ -133,85 +101,98 @@ def process_projection(args):
                 if mapped_points[x, y] != 1:
                     mapped_points[x, y] = 1
                 mapped_points[x, y] += M[i] * (total - l) / total
-        # 保存当前点的bbox
+
         bboxes.append((min_mapped_x, max_mapped_x, min_mapped_y, max_mapped_y))
-        # 创建并保存mask图像
         mask_image = np.zeros((canvas_range_x, canvas_range_y), dtype=np.uint8)
         for i in range(filtered_points.shape[0]):
             mapped_x, mapped_y = (filtered_points[i, 0] - min_x) * scale, (filtered_points[i, 1] - min_y) * scale
             if 0 <= int(mapped_x) < canvas_range_x and 0 <= int(mapped_y) < canvas_range_y:
                 mask_image[int(mapped_x), int(mapped_y)] = 255
         mask_image_path = os.path.join(masks_path, f'mask_{len(bboxes)}.png')
-        # 将mask_image进行膨胀操作
         kernel = np.ones((5,5),np.uint8)
-        mask_image = cv2.dilate(mask_image, kernel, iterations = 1)
+        mask_image = cv2.dilate(mask_image, kernel, iterations=1)
         cv2.imwrite(mask_image_path, mask_image)
 
-        # 计算外轮廓
         ret, mask = cv2.threshold(mask_image, 50, 255, cv2.THRESH_BINARY)
         contours, _ = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = sorted(contours, key=cv2.contourArea, reverse=True)
         if len(contours) >= 1:
             second_contour = contours[0]
             bub_conts.append(second_contour)
+    return bboxes, bub_conts, mapped_points
+
+def process_projection(mp_args):
+    i_projection, point_fibonacci, allocated_meshes, allocated_origin_meshes, base_path, gas_holdup, v, scale, alpha, truncation = mp_args
+    masks_path = os.path.join(base_path, f'{str(i_projection).zfill(3)}/masks')
+    if not os.path.exists(masks_path):
+        os.makedirs(masks_path)
+    meshes = [mesh.rotate_vector(np.cross(point_fibonacci, v), np.arccos(np.dot(point_fibonacci, v)) * 180 / np.pi, inplace=False) for mesh in allocated_meshes]
+    meshes_origin = [mesh.rotate_vector(np.cross(point_fibonacci, v), np.arccos(np.dot(point_fibonacci, v)) * 180 / np.pi, inplace=False) for mesh in allocated_origin_meshes]
+    mesh_fibonacci = pv.merge([mesh for mesh in meshes_origin])
+    mesh_fibonacci.save(os.path.join(base_path, f'{str(i_projection).zfill(3)}/{gas_holdup}_fibonacci.stl'))
+
+    all_points = [mesh.points for mesh in meshes]
+    all_vectors = [mesh.point_normals for mesh in meshes]
+    volume_size_x = max([np.max(point[:, 0]) for point in all_points]) - min([np.min(point[:, 0]) for point in all_points])
+    volume_size_y = max([np.max(point[:, 1]) for point in all_points]) - min([np.min(point[:, 1]) for point in all_points])
+    canvas_range_x = int(scale * volume_size_x)
+    canvas_range_y = int(scale * volume_size_y)
+
+    # Sort all_points and all_vectors based on the maximum value of the last column of each array in all_points
+    sorted_indices = np.argsort([np.max(point[:, 2]) for point in all_points])[::-1]
+    all_points = [all_points[i] for i in sorted_indices]
+    all_vectors = [all_vectors[i] for i in sorted_indices]
+
+    min_x, max_x = np.min([np.min(point[:, 0]) for point in all_points]), np.max([np.max(point[:, 0]) for point in all_points])
+    min_y, max_y = np.min([np.min(point[:, 1]) for point in all_points]), np.max([np.max(point[:, 1]) for point in all_points])
+    bboxes, bub_conts, mapped_points = pixel_coloring(masks_path, alpha, all_points, all_vectors, min_x, min_y, scale, canvas_range_x, canvas_range_y)
 
     indices = np.where(mapped_points == 1)
     mapped_points[indices] = 0
     mapped_points = gaussian_filter(mapped_points, sigma=1)
-    truncation = 0.75
+    
     mapped_points_normalized = np.clip(mapped_points / mapped_points.max(), 0, truncation) / truncation
     mapped_points_normalized[indices] = 1
 
     mapped_points_normalized = gaussian_filter(mapped_points_normalized, sigma=0.75)
     mapped_points_normalized = median_filter(mapped_points_normalized, size=5)
-    # mapped_points_normalized = np.clip(mapped_points_normalized, 0, 1)
     mapped_points_normalized = (mapped_points_normalized - mapped_points_normalized.min()) / (mapped_points_normalized.max() - mapped_points_normalized.min())
-    # plt.imsave(os.path.join(base_path, 'bubbly_flow.png'), mapped_points_normalized.T, cmap='gray')
 
-    # 创建一个复制的图像用于绘制矩形框
     mapped_points_normalized = (mapped_points_normalized * 255).astype(np.uint8).T
     mapped_points_normalized = cv2.cvtColor(mapped_points_normalized, cv2.COLOR_GRAY2RGB)
     mapped_points_normalized = cv2_enhance_contrast(mapped_points_normalized, 2)
 
     image_with_bboxes = mapped_points_normalized.copy()
-    # 遍历所有的矩形框
     with open(os.path.join(base_path, f'{str(i_projection).zfill(3)}/bubbly_flow.txt'), 'w') as f:
         for i, bbox in enumerate(bboxes):
             min_mapped_x, max_mapped_x, min_mapped_y, max_mapped_y = map(int, bbox)
-            # 检查当前矩形框与其他所有矩形框是否发生重叠
             is_overlapping = False
             for j, other_bbox in enumerate(bboxes):
-                if i != j:  # 排除自身
+                if i != j:
                     other_min_mapped_x, other_max_mapped_x, other_min_mapped_y, other_max_mapped_y = map(int, other_bbox)
-                    # 检查是否发生重叠
                     if (min_mapped_x <= other_max_mapped_x and max_mapped_x >= other_min_mapped_x and
                             min_mapped_y <= other_max_mapped_y and max_mapped_y >= other_min_mapped_y):
                         is_overlapping = True
                         break
-            # 根据是否重叠设置框的颜色
-            color = (0, 0, 192) if is_overlapping else (53, 130, 84)  # BGR
-            # 绘制矩形框到图像上
+            color = (0, 0, 192) if is_overlapping else (53, 130, 84)
             cv2.rectangle(image_with_bboxes, (min_mapped_x - 2, min_mapped_y - 2), (max_mapped_x + 2, max_mapped_y + 2), color, 2)
-            # 将bbox信息写入txt文件
             f.write(f"{int(is_overlapping)} {(min_mapped_x + min_mapped_x)/ 2 / canvas_range_x} {(min_mapped_y + min_mapped_y)/ 2 / canvas_range_y} {(max_mapped_x-min_mapped_x)/canvas_range_x} {(max_mapped_y-min_mapped_y)/canvas_range_y}\n")
-    # 保存图像
     image_with_bboxes = cv2.transpose(image_with_bboxes)
     mapped_points_normalized = cv2.transpose(mapped_points_normalized)
     cv2.imwrite(os.path.join(base_path, f'{str(i_projection).zfill(3)}/bubbly_flow.png'), mapped_points_normalized)
     cv2.imwrite(os.path.join(base_path, f'{str(i_projection).zfill(3)}/bubbly_flow_bboxes.png'), image_with_bboxes)
 
-    # 保存mask合并后的的掩码图
     SAM_background_merge = np.zeros((canvas_range_x + 128 * 2, canvas_range_y + 128 * 2, 3), np.uint8)
     colors = []
     for xx in range(len(bub_conts)):
         bub_conts[xx][:, 0, 0] += 128
         bub_conts[xx][:, 0, 1] += 128
     for bub_cont in bub_conts:
-        if len(contours[0]) > 10:
+        if len(bub_cont[0]) > 10:
             zeros = np.ones((SAM_background_merge.shape), dtype=np.uint8) * 255
             color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
             cv2.drawContours(SAM_background_merge, [bub_cont], -1, color=color, thickness=cv2.FILLED)
-            colors.append(tuple(c / 255 for c in color))  # 保存第一次随机生成的颜色
+            colors.append(tuple(c / 255 for c in color))
 
     SAM_background_merge = SAM_background_merge[128 : canvas_range_x + 128, 128 : canvas_range_y + 128]
     cv2.imwrite(os.path.join(base_path, f'{str(i_projection).zfill(3)}/mask.png'), SAM_background_merge)
@@ -252,16 +233,11 @@ def process_projection(args):
     plt.axis('off')
     plt.savefig(os.path.join(base_path, f'{str(i_projection).zfill(3)}/mask_merge_bboxes.png'), bbox_inches='tight', pad_inches=0, dpi=150)
 
-def generater(stl_files, volume_size_x, volume_size_y, volume_height):
-    # plotter = pv.Plotter()
-    # for gas_ratio in [0.005, 0.01]:
-    for gas_ratio in [0.02]:
-        # expected_volume = volume_size ** 2 * math.pi / 4 * volume_height * gas_ratio
-        expected_volume = volume_size_x * volume_size_y * volume_height * gas_ratio
-        for _ in range(1):
-            timestamp = datetime.now().strftime('%Y%m%dT%H%M%S-%f')
-            base_path = f'C:/DataSet_DOOR/dataset_3Dbubble/3Dbubbleflowrender/{timestamp}'
-            os.makedirs(base_path, exist_ok=True)
+def generater(stl_files, base_path, flow_num, volume_size_x, volume_size_y, volume_height, gas_holdups, alpha, truncation, poisson_max_iter, sample_spacing):
+    for gas_holdup in gas_holdups:
+        expected_volume = volume_size_x * volume_size_y * volume_height * gas_holdup
+        for _ in range(flow_num):
+
             names = []
             meshes = []
             meshes_origin = []
@@ -270,16 +246,14 @@ def generater(stl_files, volume_size_x, volume_size_y, volume_height):
             allocated_origin_meshes = []
             total_volume = 0
 
-            # Prepare bubbles
             chosen_volumes = []
             while total_volume < expected_volume:
                 chosen_volume = np.random.lognormal(mean=3.5, sigma=1.0) / 1000
                 chosen_volumes.append(chosen_volume)
                 total_volume += chosen_volume
 
-            # Use multiprocessing to upsample point clouds
             with mp.Pool(processes=mp.cpu_count()) as pool:
-                mesh_data = pool.starmap(upsample_and_scale_mesh, [(stl_files, 20000, vol) for vol in chosen_volumes])
+                mesh_data = pool.starmap(upsample_and_scale_mesh, [(stl_files, 20000, vol, sample_spacing) for vol in chosen_volumes])
 
             for stl_file, mesh, mesh_origin, volume in mesh_data:
                 names.append(stl_file)
@@ -287,8 +261,8 @@ def generater(stl_files, volume_size_x, volume_size_y, volume_height):
                 meshes_origin.append(mesh_origin)
                 volumes.append(volume * 10)
 
-            points = generate_points_in_cube(len(meshes), weights=volumes,
-                                                cube_size=np.array([volume_size_x, volume_size_y, volume_height]) * 1.2)
+            points = generate_points_in_cube(len(meshes),
+                                             cube_size=np.array([volume_size_x, volume_size_y, volume_height]) * 1.2, poisson_max_iter = poisson_max_iter)
 
             for mesh, mesh_origin, point in zip(meshes, meshes_origin, points):  
                 mesh.points += point
@@ -304,9 +278,8 @@ def generater(stl_files, volume_size_x, volume_size_y, volume_height):
 
             mesh = pv.merge([mesh for mesh in allocated_meshes])
             mesh_origin = pv.merge([mesh for mesh in allocated_origin_meshes])
-            mesh_origin.save(os.path.join(base_path, f'{gas_ratio}.stl'))
+            mesh_origin.save(os.path.join(base_path, f'{gas_holdup}.stl'))
 
-            # Use four projection points
             points_fibonacci = np.array([[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0]])
             points_output_path = os.path.join(base_path, "points_fibonacci.csv")
             np.savetxt(points_output_path, points_fibonacci, delimiter=",")
@@ -317,8 +290,8 @@ def generater(stl_files, volume_size_x, volume_size_y, volume_height):
             # Prepare data for multiprocessing
             args_list = []
             for i_projection, point_fibonacci in enumerate(points_fibonacci):
-                args = (i_projection, point_fibonacci, allocated_meshes, allocated_origin_meshes, base_path, gas_ratio, v, scale)
-                args_list.append(args)
+                mp_args = (i_projection, point_fibonacci, allocated_meshes, allocated_origin_meshes, base_path, gas_holdup, v, scale, alpha, truncation)
+                args_list.append(mp_args)
 
             # Use multiprocessing to process each projection in parallel
             with mp.Pool(processes=mp.cpu_count()) as pool:
@@ -326,19 +299,44 @@ def generater(stl_files, volume_size_x, volume_size_y, volume_height):
                 
     # 保存当前py文件到base_path目录下
     current_file_path = __file__
-    destination_path = os.path.join(base_path, 'FlowRenderer_1118.py')
+    destination_path = os.path.join(base_path, 'FlowRenderer.py')
     shutil.copy(current_file_path, destination_path)
 
 if __name__ =='__main__':
-    
-    path_to_stl_files1 = r"C:\DataSet_DOOR\dataset_3Dbubble\1008-gel-reexport\mesh"
-    stl_files = [os.path.join(path_to_stl_files1, f) for f in os.listdir(path_to_stl_files1) if f.endswith('.stl')]
 
-    volume_size_x = 5
-    volume_size_y = 5
-    volume_height = 15
+    parser = argparse.ArgumentParser(description='流场生成器与渲染器')
+    parser.add_argument('--stl_path', type=str, default=r"C:/DataSet_DOOR/dataset_3Dbubble/1008-gel-reexport/mesh", help='STL文件的路径')
+    parser.add_argument('--save_path', type=str, default=r"C:/DataSet_DOOR/dataset_3Dbubble/3Dbubbleflowrender/", help='保存路径')
+    parser.add_argument('--flow_num', type=int, default=1, help='生成数量')
+    parser.add_argument('--volume_size_x', type=int, default=5, help='流场宽度[mm]')
+    parser.add_argument('--volume_size_y', type=int, default=5, help='流场深度[mm]')
+    parser.add_argument('--volume_height', type=int, default=15, help='流场高度[mm]')
+    parser.add_argument('--gas_holdup', type=float, default=0.005, help='气含率')
+    parser.add_argument('--alpha', type=int, default=4, help='向量指数:Alpha')
+    parser.add_argument('--truncation', type=float, default=0.75, help='截断值')
+    parser.add_argument('--poisson_max_iter', type=int, default=100000, help='泊松圆盘采样最大迭代次数')
+    parser.add_argument('--sample_spacing', type=int, default=0.01, help='点云上采样的采样距离')
+
+    args = parser.parse_args()
+
+    timestamp = datetime.now().strftime('%Y%m%dT%H%M%S-%f')
+    base_path = f'{args.save_path}/{timestamp}'
+    os.makedirs(base_path, exist_ok=True)
+    
+    stl_files = [os.path.join(args.stl_path, f) for f in os.listdir(args.stl_path) if f.endswith('.stl')]
+
     profiler = Profiler()
     profiler.start()
-    generater(stl_files, volume_size_x, volume_size_y, volume_height)
+    generater(stl_files, base_path, args.flow_num, args.volume_size_x, args.volume_size_y, args.volume_height, gas_holdups=[args.gas_holdup], alpha=args.alpha, truncation=args.truncation, poisson_max_iter=args.poisson_max_iter, sample_spacing = args.sample_spacing)
     profiler.stop()
     profiler.print()
+
+    print("保存路径:", base_path)
+    print("生成数量:", args.flow_num)
+    print("流场宽度[mm]:", args.volume_size_x)
+    print("流场深度[mm]:", args.volume_size_y)
+    print("流场高度[mm]:", args.volume_height)
+    print("气含率:", args.gas_holdup)
+    print("向量指数:Alpha:", args.alpha)
+    print("截断值:", args.truncation)
+    print("采样距离:", args.sample_spacing)
