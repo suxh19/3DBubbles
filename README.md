@@ -2,6 +2,8 @@
 
 # 3DBubbles
 
+<img src="img/3DBubbles_logo.png" width="60%" style="margin: 0 auto;">
+
 A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the MIT protocol provides high-precision bubble flow 3D and 2D data and statistical information.
 
 3DBubbles includes the following three types of data:
@@ -69,6 +71,10 @@ python .\FlowRenderer.py -num 1 -x 5 -y 5 -hh 5 --gas_holdup 0.01
 
 Results:
 
+[3D digital model of bubbly flow](3Dbubbleflowrender/20250110T172559-117775/000/0.01_fibonacci.stl)
+
+<img src="img/3D_Bubbly_flow.png" width="60%">
+
 Bubbly Flow Image：
 
 <img src="3Dbubbleflowrender/20250110T172559-117775/000/bubbly_flow.png" width="60%">
@@ -133,7 +139,7 @@ See [Update_log.md](Update_log.md) for the update log.
 
 ## Contact
 
-Auther：Baodi Yu，e-mail: <yubaodi20@ipe.ac.cn>
+Auther：Baodi Yu (于宝地)，e-mail: <yubaodi20@ipe.ac.cn>
 
 ## Citation
 Please cite our paper if you find this code useful:

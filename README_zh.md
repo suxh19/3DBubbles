@@ -1,6 +1,7 @@
 **语言版本: [English](README.md), [中文](README_zh.md).**
 
 # 3DBubbles
+<img src="img/3DBubbles_logo.png" width="60%" style="margin: 0 auto;">
 
 遵循MIT协议的公开的气液两相流数据集（3DBubbles），提供高精度气泡流3D、2D数据及统计信息。3DBubbles包括以下三类数据类型：
 1. "stl"格式的单气泡3D结构。气泡结构由静态气液流场模体产生，通过自主研发的高空间分辨率X射线CT系统数字化和后处理；
@@ -39,6 +40,8 @@
         ├── ……
         └── 10823
 
+演示：
+
 ## Usage
 ### 测试环境
 Current version only supports training and inference on CPU. It works well under dependencies as follows:
@@ -63,6 +66,10 @@ python .\FlowRenderer.py -num 1 -x 5 -y 5 -hh 5 --gas_holdup 0.01
 ```
 运行结果：
 
+[气泡流三维模型](3Dbubbleflowrender/20250110T172559-117775/000/0.01_fibonacci.stl)
+
+<img src="img/3D_Bubbly_flow.png" width="60%">
+
 气泡流图像：
 
 <img src="3Dbubbleflowrender/20250110T172559-117775/000/bubbly_flow.png" width="60%">
@@ -82,8 +89,6 @@ python .\FlowRenderer.py -num 1 -x 5 -y 5 -hh 5 --gas_holdup 0.01
 气泡流与检测框和掩码图像：
 
 <img src="3Dbubbleflowrender/20250110T172559-117775/000/mask_merge_bboxes.png" width="60%">
-
-[气泡流三维模型](3Dbubbleflowrender/20250110T172559-117775/000/0.01_fibonacci.stl)
 
 argparse提供的可选参数如下：
 ```
