@@ -10,6 +10,7 @@ from scipy.ndimage import median_filter, gaussian_filter
 import csv
 import shutil
 from pyinstrument import Profiler
+from tqdm import trange
 import multiprocessing as mp
 import argparse
 
@@ -129,7 +130,7 @@ def process_projection(mp_args):
     meshes = [mesh.rotate_vector(np.cross(point_fibonacci, v), np.arccos(np.dot(point_fibonacci, v)) * 180 / np.pi, inplace=False) for mesh in allocated_meshes]
     meshes_origin = [mesh.rotate_vector(np.cross(point_fibonacci, v), np.arccos(np.dot(point_fibonacci, v)) * 180 / np.pi, inplace=False) for mesh in allocated_origin_meshes]
     mesh_fibonacci = pv.merge([mesh for mesh in meshes_origin])
-    mesh_fibonacci.save(os.path.join(base_path, f'{str(i_projection).zfill(3)}/{gas_holdup}_fibonacci.stl'))
+    mesh_fibonacci.save(os.path.join(base_path, f'{str(i_projection).zfill(3)}/{gas_holdup}.stl'))
 
     all_points = [mesh.points for mesh in meshes]
     all_vectors = [mesh.point_normals for mesh in meshes]
@@ -188,7 +189,7 @@ def process_projection(mp_args):
         bub_conts[xx][:, 0, 0] += 128
         bub_conts[xx][:, 0, 1] += 128
     for bub_cont in bub_conts:
-        if len(bub_cont[0]) > 10:
+        if bub_cont.shape[0] > 6:
             zeros = np.ones((SAM_background_merge.shape), dtype=np.uint8) * 255
             color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
             cv2.drawContours(SAM_background_merge, [bub_cont], -1, color=color, thickness=cv2.FILLED)
@@ -233,69 +234,68 @@ def process_projection(mp_args):
     plt.axis('off')
     plt.savefig(os.path.join(base_path, f'{str(i_projection).zfill(3)}/mask_merge_bboxes.png'), bbox_inches='tight', pad_inches=0, dpi=150)
 
-def generater(stl_files, base_path, flow_num, volume_size_x, volume_size_y, volume_height, gas_holdups, alpha, truncation, poisson_max_iter, sample_spacing):
+def generater(stl_files, base_path, volume_size_x, volume_size_y, volume_height, gas_holdups, alpha, truncation, poisson_max_iter, sample_spacing):
     for gas_holdup in gas_holdups:
         expected_volume = volume_size_x * volume_size_y * volume_height * gas_holdup
-        for _ in range(flow_num):
 
-            names = []
-            meshes = []
-            meshes_origin = []
-            volumes = []
-            allocated_meshes = []
-            allocated_origin_meshes = []
-            total_volume = 0
+        names = []
+        meshes = []
+        meshes_origin = []
+        volumes = []
+        allocated_meshes = []
+        allocated_origin_meshes = []
+        total_volume = 0
 
-            chosen_volumes = []
-            while total_volume < expected_volume:
-                chosen_volume = np.random.lognormal(mean=3.5, sigma=1.0) / 1000
-                chosen_volumes.append(chosen_volume)
-                total_volume += chosen_volume
+        chosen_volumes = []
+        while total_volume < expected_volume:
+            chosen_volume = np.random.lognormal(mean=3.5, sigma=1.0) / 1000
+            chosen_volumes.append(chosen_volume)
+            total_volume += chosen_volume
 
-            with mp.Pool(processes=mp.cpu_count()) as pool:
-                mesh_data = pool.starmap(upsample_and_scale_mesh, [(stl_files, 20000, vol, sample_spacing) for vol in chosen_volumes])
+        with mp.Pool(processes=mp.cpu_count()) as pool:
+            mesh_data = pool.starmap(upsample_and_scale_mesh, [(stl_files, 20000, vol, sample_spacing) for vol in chosen_volumes])
 
-            for stl_file, mesh, mesh_origin, volume in mesh_data:
-                names.append(stl_file)
-                meshes.append(mesh)
-                meshes_origin.append(mesh_origin)
-                volumes.append(volume * 10)
+        for stl_file, mesh, mesh_origin, volume in mesh_data:
+            names.append(stl_file)
+            meshes.append(mesh)
+            meshes_origin.append(mesh_origin)
+            volumes.append(volume * 10)
 
-            points = generate_points_in_cube(len(meshes),
-                                             cube_size=np.array([volume_size_x, volume_size_y, volume_height]) * 1.2, poisson_max_iter = poisson_max_iter)
+        points = generate_points_in_cube(len(meshes),
+                                            cube_size=np.array([volume_size_x, volume_size_y, volume_height]) * 1.2, poisson_max_iter = poisson_max_iter)
 
-            for mesh, mesh_origin, point in zip(meshes, meshes_origin, points):  
-                mesh.points += point
-                allocated_meshes.append(mesh)
-                mesh_origin.points += point
-                allocated_origin_meshes.append(mesh_origin)
+        for mesh, mesh_origin, point in zip(meshes, meshes_origin, points):  
+            mesh.points += point
+            allocated_meshes.append(mesh)
+            mesh_origin.points += point
+            allocated_origin_meshes.append(mesh_origin)
 
-            with open(os.path.join(base_path, 'names_points.csv'), 'w', newline='') as file:
-                writer = csv.writer(file)
-                writer.writerow(['Name', 'X', 'Y', 'Z', 'Volume'])
-                for name, point, volume in zip(names, points, volumes):
-                    writer.writerow([name, point[0], point[1], point[2], volume])
+        with open(os.path.join(base_path, 'names_points.csv'), 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Name', 'X', 'Y', 'Z', 'Volume'])
+            for name, point, volume in zip(names, points, volumes):
+                writer.writerow([name, point[0], point[1], point[2], volume])
 
-            mesh = pv.merge([mesh for mesh in allocated_meshes])
-            mesh_origin = pv.merge([mesh for mesh in allocated_origin_meshes])
-            mesh_origin.save(os.path.join(base_path, f'{gas_holdup}.stl'))
+        mesh = pv.merge([mesh for mesh in allocated_meshes])
+        mesh_origin = pv.merge([mesh for mesh in allocated_origin_meshes])
+        mesh_origin.save(os.path.join(base_path, f'{gas_holdup}.stl'))
 
-            points_fibonacci = np.array([[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0]])
-            points_output_path = os.path.join(base_path, "points_fibonacci.csv")
-            np.savetxt(points_output_path, points_fibonacci, delimiter=",")
-            v = np.array([0.01, 0.01, 1])
-            i_projection = 0
-            scale = 100
+        points_fibonacci = np.array([[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0]])
+        points_output_path = os.path.join(base_path, "points_view.csv")
+        np.savetxt(points_output_path, points_fibonacci, delimiter=",")
+        v = np.array([0.01, 0.01, 1])
+        i_projection = 0
+        scale = 100
 
-            # Prepare data for multiprocessing
-            args_list = []
-            for i_projection, point_fibonacci in enumerate(points_fibonacci):
-                mp_args = (i_projection, point_fibonacci, allocated_meshes, allocated_origin_meshes, base_path, gas_holdup, v, scale, alpha, truncation)
-                args_list.append(mp_args)
+        # Prepare data for multiprocessing
+        args_list = []
+        for i_projection, point_fibonacci in enumerate(points_fibonacci):
+            mp_args = (i_projection, point_fibonacci, allocated_meshes, allocated_origin_meshes, base_path, gas_holdup, v, scale, alpha, truncation)
+            args_list.append(mp_args)
 
-            # Use multiprocessing to process each projection in parallel
-            with mp.Pool(processes=mp.cpu_count()) as pool:
-                pool.map(process_projection, args_list)
+        # Use multiprocessing to process each projection in parallel
+        with mp.Pool(processes=mp.cpu_count()) as pool:
+            pool.map(process_projection, args_list)
                 
     # 保存当前py文件到base_path目录下
     current_file_path = __file__
@@ -305,38 +305,40 @@ def generater(stl_files, base_path, flow_num, volume_size_x, volume_size_y, volu
 if __name__ =='__main__':
 
     parser = argparse.ArgumentParser(description='流场生成器与渲染器')
-    parser.add_argument('--stl_path', type=str, default=r"C:/DataSet_DOOR/dataset_3Dbubble/1008-gel-reexport/mesh", help='STL文件的路径')
-    parser.add_argument('--save_path', type=str, default=r"C:/DataSet_DOOR/dataset_3Dbubble/3Dbubbleflowrender/", help='保存路径')
-    parser.add_argument('--flow_num', type=int, default=1, help='生成数量')
-    parser.add_argument('--volume_size_x', type=int, default=5, help='流场宽度[mm]')
-    parser.add_argument('--volume_size_y', type=int, default=5, help='流场深度[mm]')
-    parser.add_argument('--volume_height', type=int, default=15, help='流场高度[mm]')
-    parser.add_argument('--gas_holdup', type=float, default=0.005, help='气含率')
-    parser.add_argument('--alpha', type=int, default=4, help='向量指数:Alpha')
-    parser.add_argument('--truncation', type=float, default=0.75, help='截断值')
+    parser.add_argument('--stl_path', type=str, default=r"dataset/bubbles_mesh", help='STL文件的路径')
+    parser.add_argument('--save_path', type=str, default=r"3Dbubbleflowrender/", help='保存路径')
+    parser.add_argument('-num','--flow_num', type=int, default=50, help='生成数量')
+    parser.add_argument('-x','--volume_size_x', type=int, default=5, help='流场宽度[mm]')
+    parser.add_argument('-y','--volume_size_y', type=int, default=5, help='流场深度[mm]')
+    parser.add_argument('-hh','--volume_height', type=int, default=15, help='流场高度[mm]')
+    parser.add_argument('--gas_holdup', type=float, default=0.01, help='气含率')
+    parser.add_argument('-a','--alpha', type=int, default=4, help='向量指数:Alpha')
+    parser.add_argument('-t','--truncation', type=float, default=0.75, help='截断值')
     parser.add_argument('--poisson_max_iter', type=int, default=100000, help='泊松圆盘采样最大迭代次数')
-    parser.add_argument('--sample_spacing', type=int, default=0.01, help='点云上采样的采样距离')
+    parser.add_argument('--sample_spacing', type=int, default=0.02, help='点云上采样的采样距离')
 
     args = parser.parse_args()
 
-    timestamp = datetime.now().strftime('%Y%m%dT%H%M%S-%f')
-    base_path = f'{args.save_path}/{timestamp}'
-    os.makedirs(base_path, exist_ok=True)
-    
     stl_files = [os.path.join(args.stl_path, f) for f in os.listdir(args.stl_path) if f.endswith('.stl')]
 
-    profiler = Profiler()
-    profiler.start()
-    generater(stl_files, base_path, args.flow_num, args.volume_size_x, args.volume_size_y, args.volume_height, gas_holdups=[args.gas_holdup], alpha=args.alpha, truncation=args.truncation, poisson_max_iter=args.poisson_max_iter, sample_spacing = args.sample_spacing)
-    profiler.stop()
-    profiler.print()
+    for num in trange(args.flow_num):
+        timestamp = datetime.now().strftime('%Y%m%dT%H%M%S-%f')
+        base_path = f'{args.save_path}/{timestamp}'
+        os.makedirs(base_path, exist_ok=True)
+        
+        # profiler = Profiler()
+        # profiler.start()
+        generater(stl_files, base_path, args.volume_size_x, args.volume_size_y, args.volume_height, gas_holdups=[args.gas_holdup], alpha=args.alpha, truncation=args.truncation, poisson_max_iter=args.poisson_max_iter, sample_spacing = args.sample_spacing)
+        # profiler.stop()
+        # profiler.print()
 
-    print("保存路径:", base_path)
-    print("生成数量:", args.flow_num)
-    print("流场宽度[mm]:", args.volume_size_x)
-    print("流场深度[mm]:", args.volume_size_y)
-    print("流场高度[mm]:", args.volume_height)
-    print("气含率:", args.gas_holdup)
-    print("向量指数:Alpha:", args.alpha)
-    print("截断值:", args.truncation)
-    print("采样距离:", args.sample_spacing)
+
+        print("保存路径:", base_path)
+        print("生成数量:", args.flow_num)
+        print("流场宽度[mm]:", args.volume_size_x)
+        print("流场深度[mm]:", args.volume_size_y)
+        print("流场高度[mm]:", args.volume_height)
+        print("气含率:", args.gas_holdup)
+        print("向量指数:Alpha:", args.alpha)
+        print("截断值:", args.truncation)
+        print("采样距离:", args.sample_spacing)
