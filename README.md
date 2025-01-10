@@ -1,12 +1,5 @@
 **Language version: [English](README.md), [中文](README_zh.md).**
 
-<style>
-img{
-    width: 60%;
-    padding-left: 20%;
-}
-</style>
-
 # 3DBubbles
 
 A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the MIT protocol provides high-precision bubble flow 3D and 2D data and statistical information.
@@ -76,17 +69,25 @@ python .\FlowRenderer.py -num 1 -x 5 -y 5 -hh 5 --gas_holdup 0.01
 
 Results:
 
-![Bubbly Flow Image](3Dbubbleflowrender/20250110T172559-117775/000/bubbly_flow.png)
+Bubbly Flow Image：
 
-![Bubbly Flow Image With Detection Boxes](3Dbubbleflowrender/20250110T172559-117775/000/bubbly_flow_bboxes.png)
+<img src="3Dbubbleflowrender/20250110T172559-117775/000/bubbly_flow.png" width="60%">
 
-![Bubble Masks](3Dbubbleflowrender/20250110T172559-117775/000/mask.png)
+Bubbly Flow Image With Detection Boxes：
 
-![Bubbly Flow Image with Masks](3Dbubbleflowrender/20250110T172559-117775/000/mask_merge.png)
+<img src="3Dbubbleflowrender/20250110T172559-117775/000/bubbly_flow_bboxes.png" width="60%">
 
-![Bubbles with detection boxes and masks for bubbly flow image](3Dbubbleflowrender/20250110T172559-117775/000/mask_merge_bboxes.png)
+Bubble Masks：
 
-[3D digital model of bubbly flow](3Dbubbleflowrender/20250110T172559-117775/000/0.01_fibonacci.stl)
+<img src="3Dbubbleflowrender/20250110T172559-117775/000/mask.png" width="60%">
+
+Bubbly Flow Image with Masks：
+
+<img src="3Dbubbleflowrender/20250110T172559-117775/000/mask_merge.png" width="60%">
+
+Bubbles with detection boxes and masks for bubbly flow image：
+
+<img src="3Dbubbleflowrender/20250110T172559-117775/000/mask_merge_bboxes.png" width="60%">
 
 The optional arguments provided by argparse are as follows:
 ```

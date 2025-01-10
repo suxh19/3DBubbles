@@ -1,12 +1,5 @@
 **语言版本: [English](README.md), [中文](README_zh.md).**
 
-<style>
-img{
-    width: 60%;
-    padding-left: 20%;
-}
-</style>
-
 # 3DBubbles
 
 遵循MIT协议的公开的气液两相流数据集（3DBubbles），提供高精度气泡流3D、2D数据及统计信息。3DBubbles包括以下三类数据类型：
@@ -70,15 +63,25 @@ python .\FlowRenderer.py -num 1 -x 5 -y 5 -hh 5 --gas_holdup 0.01
 ```
 运行结果：
 
-![气泡流图像](3Dbubbleflowrender/20250110T172559-117775/000/bubbly_flow.png)
+气泡流图像：
 
-![带有检测框的气泡流图像](3Dbubbleflowrender/20250110T172559-117775/000/bubbly_flow_bboxes.png)
+<img src="3Dbubbleflowrender/20250110T172559-117775/000/bubbly_flow.png" width="60%">
 
-![气泡掩码图像](3Dbubbleflowrender/20250110T172559-117775/000/mask.png)
+带有检测框的气泡流图像：
 
-![气泡流与掩码图像](3Dbubbleflowrender/20250110T172559-117775/000/mask_merge.png)
+<img src="3Dbubbleflowrender/20250110T172559-117775/000/bubbly_flow_bboxes.png" width="60%">
 
-![气泡流与检测框和掩码图像](3Dbubbleflowrender/20250110T172559-117775/000/mask_merge_bboxes.png)
+气泡掩码图像：
+
+<img src="3Dbubbleflowrender/20250110T172559-117775/000/mask.png" width="60%">
+
+气泡流与掩码图像：
+
+<img src="3Dbubbleflowrender/20250110T172559-117775/000/mask_merge.png" width="60%">
+
+气泡流与检测框和掩码图像：
+
+<img src="3Dbubbleflowrender/20250110T172559-117775/000/mask_merge_bboxes.png" width="60%">
 
 [气泡流三维模型](3Dbubbleflowrender/20250110T172559-117775/000/0.01_fibonacci.stl)
 
