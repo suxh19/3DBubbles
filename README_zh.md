@@ -1,5 +1,12 @@
 **语言版本: [English](README.md), [中文](README_zh.md).**
 
+<style>
+img{
+    width: 60%;
+    padding-left: 20%;
+}
+</style>
+
 # 3DBubbles
 
 遵循MIT协议的公开的气液两相流数据集（3DBubbles），提供高精度气泡流3D、2D数据及统计信息。3DBubbles包括以下三类数据类型：

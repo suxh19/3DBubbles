@@ -1,5 +1,12 @@
 **Language version: [English](README.md), [中文](README_zh.md).**
 
+<style>
+img{
+    width: 60%;
+    padding-left: 20%;
+}
+</style>
+
 # 3DBubbles
 
 A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the MIT protocol provides high-precision bubble flow 3D and 2D data and statistical information.
@@ -68,6 +75,7 @@ python .\FlowRenderer.py -num 1 -x 5 -y 5 -hh 5 --gas_holdup 0.01
 ```
 
 Results:
+
 ![Bubbly Flow Image](3Dbubbleflowrender/20250110T172559-117775/000/bubbly_flow.png)
 
 ![Bubbly Flow Image With Detection Boxes](3Dbubbleflowrender/20250110T172559-117775/000/bubbly_flow_bboxes.png)
