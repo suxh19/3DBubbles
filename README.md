@@ -12,7 +12,7 @@ A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the
 3. 3D bubbly flow. Includes macroscopic “stl” format 3D bubbly flow and rasterized rendered 2D bubbly flow images.
 
 Notice:
-1. The first two data have been open-sourced on the Kaggle platform at the following link: <https://www.kaggle.com/datasets/mujishan/3dbubbles>. If you need it, please give proper citation according to the last format, thanks!
+1. The first two data have been open-sourced on the Kaggle platform at the following link: <https://www.kaggle.com/datasets/ai4ctofipe/3dbubbles>. If you need it, please give proper citation according to the last format, thanks!
 2. 3D bubbly flow data is generated via [FlowRenderer.py](FlowRenderer.py) file.
 
 ## File tree of 3DBubbles dataset
@@ -55,7 +55,7 @@ Current version only supports training and inference on CPU. It works well under
 * matplotlib 3.7.5 / 3.9.3
 
 ### Data preparation
-Before running the code, please download the 3DBubbles dataset at the Kaggle platform: <https://www.kaggle.com/datasets/mujishan/3dbubbles>, which has 10,823 stl files.
+Before running the code, please download the 3DBubbles dataset at the Kaggle platform: <https://www.kaggle.com/datasets/ai4ctofipe/3dbubbles>, which has 10,823 stl files.
 
 **Note that we uploaded only 20 of these stl files at GitHub.**
 

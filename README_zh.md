@@ -9,7 +9,7 @@
 3. 3D气泡流。包括宏观的“stl”格式的3D气泡流和光栅化渲染的2D气泡流图像。
 
 注意：
-1. 前两项的数据已在Kaggle平台开源，数据集链接：<https://www.kaggle.com/datasets/mujishan/3dbubbles>。如果您有需要，请按照最后的格式引用。
+1. 前两项的数据已在Kaggle平台开源，数据集链接：<https://www.kaggle.com/datasets/ai4ctofipe/3dbubbles>。如果您有需要，请按照最后的格式引用。
 2. 3D气泡流数据通过[FlowRenderer.py](FlowRenderer.py)文件生成。
 
 ## 3DBubbles数据集
@@ -53,7 +53,7 @@ Current version only supports training and inference on CPU. It works well under
 * matplotlib 3.7.5 / 3.9.3
 
 ### 数据准备Data preparation
-请提前在Kaggle平台下载3DBubbles数据集：<https://www.kaggle.com/datasets/mujishan/3dbubbles>，共有10823个stl文件。
+请提前在Kaggle平台下载3DBubbles数据集：<https://www.kaggle.com/datasets/ai4ctofipe/3dbubbles>，共有10823个stl文件。
 
 **我们在GitHub仅上传了3DBubbles数据集中的20个stl文件。**
 
