@@ -139,7 +139,7 @@ See [Update_log.md](Update_log.md) for the update log.
 
 ## Contact
 
-Auther：Baodi Yu (于宝地)，e-mail: <yubaodi20@ipe.ac.cn>
+Author: Baodi Yu (于宝地)，e-mail: <yubaodi20@ipe.ac.cn>
 
 ## Citation
 Please cite our paper if you find this code useful:
