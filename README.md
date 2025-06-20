@@ -4,12 +4,12 @@
 
 <img src="img/3DBubbles_logo.png" width="60%" style="margin: 0 auto;">
 
-A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the MIT protocol provides high-precision bubble flow 3D and 2D data and statistical information.
+A publicly available gas-liquid two-phase flow dataset (3DBubbles) following the Apache License 2.0 protocol provides high-precision bubble flow 3D and 2D data and statistical information.
 
 3DBubbles includes the following three types of data:
 1. Single bubble 3D structures in ``stl'' format. The bubble structure is generated from a static gas-liquid flow field phantom, which is digitized and post-processed by a in-house developed high spatial resolution X-ray CT system;
 2. Single bubble 2D images in ``png'' format. Obtained by rasterized rendering of the 3D point cloud, each 3D bubble provides a rendered image with 26 angles.
-3. 3D bubbly flow. Includes macroscopic “stl” format 3D bubbly flow and rasterized rendered 2D bubbly flow images.
+3. 3D bubbly flow. Includes macroscopic "stl" format 3D bubbly flow and rasterized rendered 2D bubbly flow images.
 
 Notice:
 1. The first two data have been open-sourced on the Kaggle platform at the following link: <https://www.kaggle.com/datasets/ai4ctofipe/3dbubbles>. If you need it, please give proper citation according to the last format, thanks!
@@ -140,6 +140,7 @@ See [Update_log.md](Update_log.md) for the update log.
 ## Contact
 
 Author: Baodi Yu (于宝地)，e-mail: <yubaodi20@ipe.ac.cn>
+Research Group: AI4CT
 
 ## Citation
 Please cite our paper if you find this code useful:
