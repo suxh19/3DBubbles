@@ -208,7 +208,7 @@ def generater(stl_files, base_path, volume_size_x, volume_size_y, volume_height,
 
         mesh = pv.merge([mesh for mesh in allocated_meshes])
         mesh_origin = pv.merge([mesh for mesh in allocated_origin_meshes])
-        mesh_origin.save(os.path.join(base_path, f'{gas_holdup}{volume_size_x}{volume_size_y}_{volume_height}.stl'))  # 输出整体三维气泡场，方便后续检查
+        mesh_origin.save(os.path.join(base_path, f'{gas_holdup}_{volume_size_x}_{volume_size_y}_{volume_height}.stl'))  # 输出整体三维气泡场，方便后续检查
 
 
 def _run_single_flow(task):
