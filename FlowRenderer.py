@@ -255,7 +255,7 @@ if __name__ =='__main__':
     parser.add_argument('-x','--volume_size_x', type=int, default=5, help='流场宽度[mm]')
     parser.add_argument('-y','--volume_size_y', type=int, default=5, help='流场深度[mm]')
     parser.add_argument('-hh','--volume_height', type=int, default=15, help='流场高度[mm]')
-    parser.add_argument('--gas_holdup', type=float, default=0.01, help='气含率')
+    parser.add_argument('--gas_holdup', type=float, default=0.05, help='气含率')
     parser.add_argument('--poisson_max_iter', type=int, default=100000, help='泊松圆盘采样最大迭代次数')
     parser.add_argument('--sample_spacing', type=int, default=0.02, help='点云上采样的采样距离')
     parser.add_argument('--workers', type=int, default=8, help='并行生成流场的进程数')
