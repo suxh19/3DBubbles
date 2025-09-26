@@ -1,0 +1,1 @@
+find /home/suxh/mount/code/pycode/3DBubbles/3Dbubbleflowrender -type d -name "images" -exec rm -rf {} +

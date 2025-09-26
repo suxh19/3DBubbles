@@ -34,8 +34,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--resolution",
         type=int,
-        default=200,
-        help="Voxel resolution passed to tovoxel.convert_file (default: 500)",
+        default=1000000,
+        help="Voxel resolution passed to tovoxel.convert_file (default: 1000000)",
     )
     parser.add_argument(
         "--no-parallel",
@@ -44,6 +44,14 @@ def parse_args() -> argparse.Namespace:
         help="Disable parallel mode in tovoxel.convert_file",
     )
     parser.set_defaults(parallel=True)
+    parser.add_argument(
+        "--voxel-size",
+        nargs=3,
+        type=float,
+        default=[0.005, 0.005, 0.1],
+        metavar=("X", "Y", "Z"),
+        help="Voxel size in each dimension (default: 0.005 0.005 0.1)",
+    )
     parser.add_argument(
         "--force",
         action="store_true",
@@ -73,6 +81,7 @@ def convert_directory(
     stl_files: Iterable[Path],
     resolution: int,
     parallel: bool,
+    voxel_size: List[float],
     force: bool,
 ) -> None:
     images_dir = flow_dir / "images"
@@ -90,6 +99,7 @@ def convert_directory(
             str(output_path),
             resolution=resolution,
             parallel=parallel,
+            voxel_size=voxel_size,
         )
 
 
@@ -101,7 +111,7 @@ def main() -> None:
         return
 
     for flow_dir, stl_files in sorted(groups.items()):
-        convert_directory(flow_dir, stl_files, args.resolution, args.parallel, args.force)
+        convert_directory(flow_dir, stl_files, args.resolution, args.parallel, args.voxel_size, args.force)
 
 
 if __name__ == "__main__":
