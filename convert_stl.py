@@ -157,6 +157,24 @@ def main() -> None:
     else:
         max_workers = args.jobs
 
+    inner_parallel = args.parallel
+    if max_workers > 1 and inner_parallel:
+        print("[info] Disabling tovoxel internal parallelism when running multiple workers")
+        inner_parallel = False
+
+    if max_workers == 1:
+        for flow_dir, stl_files in sorted(groups.items()):
+            convert_directory(
+                flow_dir,
+                stl_files,
+                args.resolution,
+                inner_parallel,
+                args.voxel_size,
+                args.force,
+                None,
+            )
+        return
+
     futures: List[Future[None]] = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for flow_dir, stl_files in sorted(groups.items()):
@@ -165,7 +183,7 @@ def main() -> None:
                     flow_dir,
                     stl_files,
                     args.resolution,
-                    args.parallel,
+                    inner_parallel,
                     args.voxel_size,
                     args.force,
                     executor,
