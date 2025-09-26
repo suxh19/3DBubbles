@@ -11,6 +11,7 @@
 import os
 import random
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 import pyvista as pv
 import numpy as np
 from tqdm import trange
@@ -128,7 +129,7 @@ def generate_points_in_cube(num_points, cube_size=np.array([100, 100, 100]), num
 
     return to_numpy(accepted[:num_points])
 
-def generater(stl_files, base_path, volume_size_x, volume_size_y, volume_height, gas_holdups, poisson_max_iter, sample_spacing):
+def generater(stl_files, base_path, volume_size_x, volume_size_y, volume_height, gas_holdups, poisson_max_iter, sample_spacing, mesh_workers=None):
     """生成目标气含率的气泡云，并输出位置表与合并 STL。"""
     for gas_holdup in gas_holdups:
         expected_volume = volume_size_x * volume_size_y * volume_height * gas_holdup
@@ -171,12 +172,23 @@ def generater(stl_files, base_path, volume_size_x, volume_size_y, volume_height,
         chosen_volumes = to_numpy(chosen_volumes_xp)
         chosen_volumes_list = [float(v) for v in np.asarray(chosen_volumes).ravel()]
 
+        tasks = [(stl_files, 20000, vol, sample_spacing) for vol in chosen_volumes_list]
+
         # 并行执行上采样及体积缩放，加速气泡实例准备
-        with mp.Pool(processes=mp.cpu_count()) as pool:
-            mesh_data = pool.starmap(
-                upsample_and_scale_mesh,
-                [(stl_files, 20000, vol, sample_spacing) for vol in chosen_volumes_list],
-            )
+        pool_size = mesh_workers or mp.cpu_count()
+        if pool_size <= 1 or not tasks:
+            mesh_data = [upsample_and_scale_mesh(*task) for task in tasks]
+        else:
+            current = mp.current_process()
+
+            if getattr(current, "daemon", False):
+                # Daemon 进程无法再派生子进程，退化为线程池避免报错
+                with ThreadPoolExecutor(max_workers=pool_size) as executor:
+                    mesh_data = list(executor.map(lambda params: upsample_and_scale_mesh(*params), tasks))
+            else:
+                ctx = mp.get_context("spawn")
+                with ctx.Pool(processes=pool_size) as pool:
+                    mesh_data = pool.starmap(upsample_and_scale_mesh, tasks)
 
         for stl_file, mesh, mesh_origin, volume in mesh_data:
             names.append(stl_file)
@@ -198,6 +210,41 @@ def generater(stl_files, base_path, volume_size_x, volume_size_y, volume_height,
         mesh_origin = pv.merge([mesh for mesh in allocated_origin_meshes])
         mesh_origin.save(os.path.join(base_path, f'{gas_holdup}.stl'))  # 输出整体三维气泡场，方便后续检查
 
+
+def _run_single_flow(task):
+    """Worker helper used to generate an individual flow field."""
+    stl_files, config, flow_index = task
+    timestamp = datetime.now().strftime('%Y%m%dT%H%M%S-%f')
+    base_dir = f"{timestamp}-flow{flow_index:04d}"
+    base_path = os.path.join(config['save_path'], base_dir)
+    os.makedirs(base_path, exist_ok=True)
+
+    generater(
+        stl_files,
+        base_path,
+        config['volume_size_x'],
+        config['volume_size_y'],
+        config['volume_height'],
+        gas_holdups=[config['gas_holdup']],
+        poisson_max_iter=config['poisson_max_iter'],
+        sample_spacing=config['sample_spacing'],
+        mesh_workers=config['mesh_workers'],
+    )
+    return flow_index, base_path
+
+
+def _print_flow_summary(result, args):
+    """Standardized console output once a flow field finishes generating."""
+    flow_index, base_path = result
+    print(f"[flow {flow_index}] 保存路径:", base_path)
+    print("生成数量:", args.flow_num)
+    print("流场宽度[mm]:", args.volume_size_x)
+    print("流场深度[mm]:", args.volume_size_y)
+    print("流场高度[mm]:", args.volume_height)
+    print("气含率:", args.gas_holdup)
+    print("采样距离:", args.sample_spacing)
+
+
 if __name__ =='__main__':
     # 命令行参数配置：可控制气泡数量、空间尺寸与渲染超参数
     parser = argparse.ArgumentParser(description='流场生成器与渲染器')
@@ -210,24 +257,43 @@ if __name__ =='__main__':
     parser.add_argument('--gas_holdup', type=float, default=0.01, help='气含率')
     parser.add_argument('--poisson_max_iter', type=int, default=100000, help='泊松圆盘采样最大迭代次数')
     parser.add_argument('--sample_spacing', type=int, default=0.02, help='点云上采样的采样距离')
+    parser.add_argument('--workers', type=int, default=8, help='并行生成流场的进程数')
+    parser.add_argument('--mesh_workers', type=int, default=0, help='每个流场内上采样进程数，0 表示自动分配')
 
     args = parser.parse_args()
 
     # 收集输入目录下全部 STL 模型，供随机采样使用
     stl_files = [os.path.join(args.stl_path, f) for f in os.listdir(args.stl_path) if f.endswith('.stl')]
 
-    for num in trange(args.flow_num):
-        # 使用时间戳区分每次生成的数据集
-        timestamp = datetime.now().strftime('%Y%m%dT%H%M%S-%f')
-        base_path = f'{args.save_path}/{timestamp}'
-        os.makedirs(base_path, exist_ok=True)
-        generater(stl_files, base_path, args.volume_size_x, args.volume_size_y, args.volume_height, gas_holdups=[args.gas_holdup], poisson_max_iter=args.poisson_max_iter, sample_spacing = args.sample_spacing)
+    os.makedirs(args.save_path, exist_ok=True)
 
-        print("保存路径:", base_path)
-        print("生成数量:", args.flow_num)
-        print("流场宽度[mm]:", args.volume_size_x)
-        print("流场深度[mm]:", args.volume_size_y)
-        print("流场高度[mm]:", args.volume_height)
-        print("气含率:", args.gas_holdup)
+    flow_workers = max(1, args.workers)
+    if args.mesh_workers and args.mesh_workers > 0:
+        mesh_workers = args.mesh_workers
+    else:
+        mesh_workers = max(1, mp.cpu_count() // flow_workers)
 
-        print("采样距离:", args.sample_spacing)
+    config = {
+        'save_path': args.save_path,
+        'volume_size_x': args.volume_size_x,
+        'volume_size_y': args.volume_size_y,
+        'volume_height': args.volume_height,
+        'gas_holdup': args.gas_holdup,
+        'poisson_max_iter': args.poisson_max_iter,
+        'sample_spacing': args.sample_spacing,
+        'mesh_workers': mesh_workers,
+    }
+
+    if flow_workers <= 1 or args.flow_num == 1:
+        for flow_index in trange(args.flow_num):
+            result = _run_single_flow((stl_files, config, flow_index))
+            _print_flow_summary(result, args)
+    else:
+        tasks = [(stl_files, config, idx) for idx in range(args.flow_num)]
+        progress = trange(args.flow_num, desc='Generating', leave=False)
+        ctx = mp.get_context('spawn')
+        with ctx.Pool(processes=flow_workers) as pool:
+            for result in pool.imap_unordered(_run_single_flow, tasks):
+                _print_flow_summary(result, args)
+                progress.update(1)
+        progress.close()
