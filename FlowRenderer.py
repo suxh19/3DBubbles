@@ -179,7 +179,7 @@ def process_projection(mp_args):
     canvas_range_x = int(scale * volume_size_x)
     canvas_range_y = int(scale * volume_size_y)
 
-    # Sort all_points and all_vectors based on the maximum value of the last column of each array in all_points
+    # 按气泡最高点排序，模拟前后遮挡关系
     sorted_indices = np.argsort([np.max(point[:, 2]) for point in all_points])[::-1]
     all_points = [all_points[i] for i in sorted_indices]
     all_vectors = [all_vectors[i] for i in sorted_indices]
