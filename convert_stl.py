@@ -1,7 +1,108 @@
-import stltovoxel
-import os
+"""Batch STL-to-image converter.
 
-output_pathdir = 'combined'
-os.makedirs(output_pathdir, exist_ok=True)
+This utility wraps ``tovoxel.convert_file`` so we can render STL files into PNGs.
+It supports converting a single file or walking directories. For each flow folder
+(e.g. ``3Dbubbleflowrender/20250926T124110-480749-flow0000``) an ``images``
+subfolder is created where the rendered PNGs are stored. If that folder already
+exists we assume the flow has been processed and skip it.
+"""
 
-stltovoxel.convert_file('3Dbubbleflowrender/20250926T112212-646384-flow0000/0.01.stl', output_pathdir+'/1.png', parallel=True, resolution = 500)
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+from typing import Dict, Iterable, List
+
+try:  # Prefer the name requested by the user.
+    import tovoxel  # type: ignore
+except ImportError:  # Fall back to the original module name if available.
+    import stltovoxel as tovoxel  # type: ignore
+
+DEFAULT_ROOT = Path("3Dbubbleflowrender")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Convert STL files to PNGs using tovoxel.convert_file",
+    )
+    parser.add_argument(
+        "targets",
+        nargs="*",
+        default=[str(DEFAULT_ROOT)],
+        help="Files or directories to convert (defaults to 3Dbubbleflowrender)",
+    )
+    parser.add_argument(
+        "--resolution",
+        type=int,
+        default=200,
+        help="Voxel resolution passed to tovoxel.convert_file (default: 500)",
+    )
+    parser.add_argument(
+        "--no-parallel",
+        dest="parallel",
+        action="store_false",
+        help="Disable parallel mode in tovoxel.convert_file",
+    )
+    parser.set_defaults(parallel=True)
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Convert even if an images folder already exists",
+    )
+    return parser.parse_args()
+
+
+def collect_targets(targets: Iterable[str]) -> Dict[Path, List[Path]]:
+    """Group STL files by their parent directory."""
+    grouped: Dict[Path, List[Path]] = {}
+    for target in targets:
+        path = Path(target).resolve()
+        if path.is_file() and path.suffix.lower() == ".stl":
+            grouped.setdefault(path.parent, []).append(path)
+            continue
+        if path.is_dir():
+            for stl_file in sorted(path.rglob("*.stl")):
+                grouped.setdefault(stl_file.parent, []).append(stl_file)
+            continue
+        print(f"[warn] Skipping unknown target: {path}")
+    return grouped
+
+
+def convert_directory(
+    flow_dir: Path,
+    stl_files: Iterable[Path],
+    resolution: int,
+    parallel: bool,
+    force: bool,
+) -> None:
+    images_dir = flow_dir / "images"
+    if images_dir.exists() and not force:
+        print(f"[skip] {flow_dir} already has an images folder")
+        return
+
+    images_dir.mkdir(exist_ok=True)
+    unique_paths = sorted({Path(stl_path).resolve() for stl_path in stl_files})
+    for stl_path in unique_paths:
+        output_path = images_dir / f"{stl_path.stem}.png"
+        print(f"[convert] {stl_path} -> {output_path}")
+        tovoxel.convert_file(
+            str(stl_path),
+            str(output_path),
+            resolution=resolution,
+            parallel=parallel,
+        )
+
+
+def main() -> None:
+    args = parse_args()
+    groups = collect_targets(args.targets)
+    if not groups:
+        print("[info] Nothing to convert")
+        return
+
+    for flow_dir, stl_files in sorted(groups.items()):
+        convert_directory(flow_dir, stl_files, args.resolution, args.parallel, args.force)
+
+
+if __name__ == "__main__":
+    main()
