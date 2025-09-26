@@ -10,6 +10,8 @@ exists we assume the flow has been processed and skip it.
 from __future__ import annotations
 
 import argparse
+import os
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Dict, Iterable, List
 
@@ -25,6 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Convert STL files to PNGs using tovoxel.convert_file",
     )
+    default_jobs = 8
     parser.add_argument(
         "targets",
         nargs="*",
@@ -57,6 +60,13 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Convert even if an images folder already exists",
     )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=default_jobs,
+        metavar="N",
+        help=f"Number of worker threads used to convert STL files (default: {default_jobs})",
+    )
     return parser.parse_args()
 
 
@@ -83,24 +93,55 @@ def convert_directory(
     parallel: bool,
     voxel_size: List[float],
     force: bool,
-) -> None:
+    executor: ThreadPoolExecutor | None,
+) -> List[Future[None]]:
     images_dir = flow_dir / "images"
     if images_dir.exists() and not force:
         print(f"[skip] {flow_dir} already has an images folder")
-        return
+        return []
 
     images_dir.mkdir(exist_ok=True)
     unique_paths = sorted({Path(stl_path).resolve() for stl_path in stl_files})
+    futures: List[Future[None]] = []
     for stl_path in unique_paths:
         output_path = images_dir / f"{stl_path.stem}.png"
-        print(f"[convert] {stl_path} -> {output_path}")
-        tovoxel.convert_file(
-            str(stl_path),
-            str(output_path),
-            resolution=resolution,
-            parallel=parallel,
-            voxel_size=voxel_size,
-        )
+        if executor is None:
+            convert_single(
+                stl_path,
+                output_path,
+                resolution,
+                parallel,
+                voxel_size,
+            )
+        else:
+            futures.append(
+                executor.submit(
+                    convert_single,
+                    stl_path,
+                    output_path,
+                    resolution,
+                    parallel,
+                    voxel_size,
+                )
+            )
+    return futures
+
+
+def convert_single(
+    stl_path: Path,
+    output_path: Path,
+    resolution: int,
+    parallel: bool,
+    voxel_size: List[float],
+) -> None:
+    print(f"[convert] {stl_path} -> {output_path}")
+    tovoxel.convert_file(
+        str(stl_path),
+        str(output_path),
+        resolution=resolution,
+        parallel=parallel,
+        voxel_size=voxel_size,
+    )
 
 
 def main() -> None:
@@ -110,8 +151,29 @@ def main() -> None:
         print("[info] Nothing to convert")
         return
 
-    for flow_dir, stl_files in sorted(groups.items()):
-        convert_directory(flow_dir, stl_files, args.resolution, args.parallel, args.voxel_size, args.force)
+    if args.jobs < 1:
+        print(f"[warn] Invalid --jobs value {args.jobs}; falling back to a single worker")
+        max_workers = 1
+    else:
+        max_workers = args.jobs
+
+    futures: List[Future[None]] = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for flow_dir, stl_files in sorted(groups.items()):
+            futures.extend(
+                convert_directory(
+                    flow_dir,
+                    stl_files,
+                    args.resolution,
+                    args.parallel,
+                    args.voxel_size,
+                    args.force,
+                    executor,
+                )
+            )
+
+        for future in futures:
+            future.result()
 
 
 if __name__ == "__main__":
