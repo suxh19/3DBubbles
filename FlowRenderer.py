@@ -129,7 +129,7 @@ def generate_points_in_cube(num_points, cube_size=np.array([100, 100, 100]), num
 
     return to_numpy(accepted[:num_points])
 
-def generater(stl_files, base_path, volume_size_x, volume_size_y, volume_height, gas_holdups, poisson_max_iter, sample_spacing, mesh_workers=None):
+def generater(stl_files, base_path, volume_size_x, volume_size_y, volume_height, gas_holdups, poisson_max_iter, sample_spacing, mesh_workers=None, flow_index=0):
     """生成目标气含率的气泡云，并输出位置表与合并 STL。"""
     for gas_holdup in gas_holdups:
         expected_volume = volume_size_x * volume_size_y * volume_height * gas_holdup
@@ -208,7 +208,7 @@ def generater(stl_files, base_path, volume_size_x, volume_size_y, volume_height,
 
         mesh = pv.merge([mesh for mesh in allocated_meshes])
         mesh_origin = pv.merge([mesh for mesh in allocated_origin_meshes])
-        mesh_origin.save(os.path.join(base_path, f'{gas_holdup}.stl'))  # 输出整体三维气泡场，方便后续检查
+        mesh_origin.save(os.path.join(base_path, f'{gas_holdup}{volume_size_x}{volume_size_y}_{volume_height}.stl'))  # 输出整体三维气泡场，方便后续检查
 
 
 def _run_single_flow(task):
@@ -229,6 +229,7 @@ def _run_single_flow(task):
         poisson_max_iter=config['poisson_max_iter'],
         sample_spacing=config['sample_spacing'],
         mesh_workers=config['mesh_workers'],
+        flow_index=flow_index,
     )
     return flow_index, base_path
 
