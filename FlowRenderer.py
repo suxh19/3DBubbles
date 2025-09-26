@@ -101,7 +101,7 @@ def pixel_coloring(masks_path, alpha, all_points, all_vectors, min_x, min_y, sca
     """将三维气泡点云投影至二维画布并生成掩模与包围框。"""
     bboxes = []
     bub_conts = []
-    mapped_points = np.ones((canvas_range_x, canvas_range_y))
+    mapped_points = np.ones((canvas_range_x, canvas_range_y))  # 以 1 作为背景，方便区分空白区域
     # 逐个气泡计算投影强度
     for points, vectors in zip(all_points, all_vectors):      # 每一个points都是一个气泡
         if vectors is None:
@@ -378,6 +378,7 @@ if __name__ =='__main__':
 
     args = parser.parse_args()
 
+    # 收集输入目录下全部 STL 模型，供随机采样使用
     stl_files = [os.path.join(args.stl_path, f) for f in os.listdir(args.stl_path) if f.endswith('.stl')]
 
     for num in trange(args.flow_num):
