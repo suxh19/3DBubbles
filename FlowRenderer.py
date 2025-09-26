@@ -365,7 +365,7 @@ def generater(stl_files, base_path, volume_size_x, volume_size_y, volume_height,
 if __name__ =='__main__':
     # 命令行参数配置：可控制气泡数量、空间尺寸与渲染超参数
     parser = argparse.ArgumentParser(description='流场生成器与渲染器')
-    parser.add_argument('--stl_path', type=str, default=r"dataset/bubbles_mesh", help='STL文件的路径')
+    parser.add_argument('--stl_path', type=str, default=r"/home/suxh/mount/dataset/mesh_20250619", help='STL文件的路径')
     parser.add_argument('--save_path', type=str, default=r"3Dbubbleflowrender/", help='保存路径')
     parser.add_argument('-num','--flow_num', type=int, default=50, help='生成数量')
     parser.add_argument('-x','--volume_size_x', type=int, default=5, help='流场宽度[mm]')
