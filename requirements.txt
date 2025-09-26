@@ -7,9 +7,5 @@ pyinstrument
 pyvista
 scipy
 tqdm
-# GPU 加速依赖 (可选)
-cupy-cuda12x>=12.0.0  # 根据 CUDA 版本选择合适的 cupy 包
-# cupy-cuda11x>=11.0.0  # 对于 CUDA 11.x 用户
-# cupy-cuda10x>=10.0.0  # 对于 CUDA 10.x 用户
-cupyx>=12.0.0  # CuPy 扩展库
-# 如果无法安装 CuPy，可以注释掉上述行，代码会自动回退到 CPU 版本
+# GPU 加速依赖 (必需)
+cupy-cuda12x>=12.0.0  # 根据 CUDA 版本选择: cupy-cuda12x, cupy-cuda11x, 或 cupy-cuda10x

@@ -18,9 +18,10 @@ import multiprocessing as mp
 import argparse
 
 try:
-    import cupy as cp
-except Exception:  # pragma: no cover - CuPy may be unavailable on some machines
+    import cupy as cp  # GPU array backend
+except ImportError:  # pragma: no cover - GPU optional
     cp = None
+
 
 
 def get_array_module(prefer_gpu: bool = True):
@@ -81,11 +82,20 @@ def upsample_point_cloud(points, num_clusters, sample_spacing):
 def generate_points_in_cube(num_points, cube_size=np.array([100, 100, 100]), num=100, poisson_max_iter=100000, prefer_gpu=True):
     """在指定长方体内执行近似泊松圆盘采样以获得气泡中心。"""
     xp = get_array_module(prefer_gpu=prefer_gpu)
-    cube_size_np = np.asarray(cube_size, dtype=np.float32)
-    cube_size_xp = xp.asarray(cube_size_np)
-    radial_limit = cube_size_xp[0].item() / 2 * 0.85
-    center_xy = cube_size_xp[:2] / 2
-    min_spacing = float(cube_size_np.min() / (num ** (1 / 3)) * 0.5)
+    cube_size_xp = xp.asarray(cube_size, dtype=xp.float32)
+
+    radial_limit_sq = (cube_size_xp[0] * xp.asarray(0.5 * 0.85, dtype=cube_size_xp.dtype)) ** 2
+    center_xy = cube_size_xp[:2] * xp.asarray(0.5, dtype=cube_size_xp.dtype)
+
+    num_array = xp.asarray(num, dtype=cube_size_xp.dtype)
+    if hasattr(xp, "cbrt"):
+        root_num = xp.cbrt(num_array)
+    else:  # NumPy<1.10 fallback
+        root_num = xp.power(num_array, xp.asarray(1.0 / 3.0, dtype=cube_size_xp.dtype))
+
+    min_spacing = cube_size_xp.min() / root_num
+    min_spacing *= xp.asarray(0.5, dtype=cube_size_xp.dtype)
+    min_spacing_sq = min_spacing * min_spacing
 
     accepted = xp.empty((0, 3), dtype=cube_size_xp.dtype)
     look_up_num = 0
@@ -95,24 +105,26 @@ def generate_points_in_cube(num_points, cube_size=np.array([100, 100, 100]), num
         if remaining_attempts <= 0:
             raise RuntimeError("超过最大迭代次数，可能无法在给定条件下生成足够的点")
 
-        batch_size = min(max(128, (num_points - accepted.shape[0]) * 8), remaining_attempts)
-        candidates = xp.random.rand(batch_size, 3).astype(cube_size_xp.dtype) * cube_size_xp
+        batch_size = min(max(128, (num_points - int(accepted.shape[0])) * 8), remaining_attempts)
+        random_sample = xp.random.rand(batch_size, 3)
+        candidates = xp.asarray(random_sample, dtype=cube_size_xp.dtype) * cube_size_xp
         look_up_num += batch_size
 
-        mask_xy = xp.linalg.norm(candidates[:, :2] - center_xy, axis=1) < radial_limit
+        delta_xy = candidates[:, :2] - center_xy
+        mask_xy = xp.sum(delta_xy * delta_xy, axis=1) < radial_limit_sq
+
         if accepted.shape[0] > 0:
             diffs = candidates[:, None, :] - accepted[None, :, :]
-            distances = xp.linalg.norm(diffs, axis=2)
-            min_distances = distances.min(axis=1)
-            mask_dist = min_distances > min_spacing
+            distances_sq = xp.sum(diffs * diffs, axis=2)
+            min_distances_sq = distances_sq.min(axis=1)
+            mask_dist = min_distances_sq > min_spacing_sq
         else:
             mask_dist = xp.ones(batch_size, dtype=bool)
 
         mask = mask_xy & mask_dist
         selected_count = int(mask.sum())
-        if selected_count:
-            new_points = candidates[mask]
-            accepted = xp.concatenate([accepted, new_points], axis=0)
+        if selected_count > 0:
+            accepted = xp.concatenate([accepted, candidates[mask]], axis=0)
 
     return to_numpy(accepted[:num_points])
 
@@ -129,20 +141,42 @@ def generater(stl_files, base_path, volume_size_x, volume_size_y, volume_height,
         allocated_origin_meshes = []
         total_volume = 0
 
-        chosen_volumes = []
         xp = get_array_module()
+        xp_dtype = xp.float32 if hasattr(xp, "float32") else np.float32
+        chosen_volume_chunks = []
         while total_volume < expected_volume:
             batch_size = max(32, int((expected_volume - total_volume) * 10))
             samples = xp.random.lognormal(mean=3.5, sigma=1.0, size=batch_size)
-            for chosen_volume in to_numpy(samples) * 0.001:
-                chosen_volumes.append(chosen_volume)
-                total_volume += chosen_volume
-                if total_volume >= expected_volume:
-                    break
+            samples = xp.asarray(samples, dtype=xp_dtype) * xp.asarray(0.001, dtype=xp_dtype)
+
+            cumulative = xp.cumsum(samples)
+            threshold = expected_volume - total_volume
+            viable_mask = cumulative <= threshold
+            count = int(viable_mask.sum())
+            if count == 0:
+                count = 1  # 至少取一个样本，避免死循环
+
+            chosen_chunk = samples[:count]
+            chosen_volume_chunks.append(chosen_chunk)
+            total_volume += float(to_numpy(cumulative[count - 1]))
+
+            if total_volume >= expected_volume:
+                break
+
+        if chosen_volume_chunks:
+            chosen_volumes_xp = xp.concatenate(chosen_volume_chunks, axis=0)
+        else:
+            chosen_volumes_xp = xp.empty((0,), dtype=xp_dtype)
+
+        chosen_volumes = to_numpy(chosen_volumes_xp)
+        chosen_volumes_list = [float(v) for v in np.asarray(chosen_volumes).ravel()]
 
         # 并行执行上采样及体积缩放，加速气泡实例准备
         with mp.Pool(processes=mp.cpu_count()) as pool:
-            mesh_data = pool.starmap(upsample_and_scale_mesh, [(stl_files, 20000, vol, sample_spacing) for vol in chosen_volumes])
+            mesh_data = pool.starmap(
+                upsample_and_scale_mesh,
+                [(stl_files, 20000, vol, sample_spacing) for vol in chosen_volumes_list],
+            )
 
         for stl_file, mesh, mesh_origin, volume in mesh_data:
             names.append(stl_file)
