@@ -167,6 +167,7 @@ def process_projection(mp_args):
     masks_path = os.path.join(base_path, f'{str(i_projection).zfill(3)}/masks')
     if not os.path.exists(masks_path):
         os.makedirs(masks_path)
+    # 将所有气泡旋转至当前观测方向，便于统一投影
     meshes = [mesh.rotate_vector(np.cross(point_fibonacci, v), np.arccos(np.dot(point_fibonacci, v)) * 180 / np.pi, inplace=False) for mesh in allocated_meshes]
     meshes_origin = [mesh.rotate_vector(np.cross(point_fibonacci, v), np.arccos(np.dot(point_fibonacci, v)) * 180 / np.pi, inplace=False) for mesh in allocated_origin_meshes]
     mesh_fibonacci = pv.merge([mesh for mesh in meshes_origin])
