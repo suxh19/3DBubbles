@@ -5,6 +5,7 @@ __pycache__/
 
 combined/
 dataset/
+dataset_bubble/
 
 # C extensions
 *.so

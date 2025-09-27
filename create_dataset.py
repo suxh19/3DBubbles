@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect images datasets into a single directory using sequential PNG filenames."""
+"""Copy image datasets into a single directory using sequential PNG filenames."""
 from __future__ import annotations
 
 import shutil
@@ -86,8 +86,9 @@ def main() -> None:
     newly_processed: list[str] = []
 
     for source_dir in sources:
-        source_id = str(source_dir.resolve())
-        if source_id in processed:
+        source_id = source_dir.relative_to(source_root).as_posix()
+        source_abs = str(source_dir.resolve())
+        if source_id in processed or source_abs in processed:
             continue
 
         next_index, copied = copy_images(source_dir, dataset_root, next_index)
@@ -97,7 +98,7 @@ def main() -> None:
         rel_dir = source_dir.relative_to(project_root)
         print(f"Copied {copied} PNG files from {rel_dir}")
         total_copied += copied
-        processed.add(source_id)
+        processed.update({source_id, source_abs})
         newly_processed.append(source_id)
 
     append_processed(dataset_root, newly_processed)
