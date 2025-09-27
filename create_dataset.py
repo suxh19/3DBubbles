@@ -7,6 +7,7 @@ from pathlib import Path
 
 PNG_SUFFIX = ".png"
 DIGIT_WIDTH = 5
+PROCESSED_LOG = ".processed_dirs.log"
 
 
 def find_next_index(dataset_root: Path) -> int:
@@ -18,16 +19,33 @@ def find_next_index(dataset_root: Path) -> int:
     return max(numbers, default=0) + 1
 
 
-def collect_source_dirs(source_root: Path, dataset_root: Path) -> list[Path]:
-    # Include legacy numbered directories in the dataset as additional sources so they get flattened.
-    legacy_dirs = [path for path in dataset_root.iterdir() if path.is_dir()]
-    image_dirs = [path for path in source_root.rglob("images") if path.is_dir()]
-    return sorted(set(legacy_dirs + image_dirs), key=lambda p: p.as_posix())
+def load_processed(dataset_root: Path) -> set[str]:
+    log_path = dataset_root / PROCESSED_LOG
+    if not log_path.exists():
+        return set()
+    with log_path.open("r", encoding="utf-8") as fh:
+        return {line.strip() for line in fh if line.strip()}
 
 
-def move_images(source_dir: Path, dataset_root: Path, starting_index: int) -> tuple[int, int]:
+def append_processed(dataset_root: Path, processed_ids: list[str]) -> None:
+    if not processed_ids:
+        return
+    log_path = dataset_root / PROCESSED_LOG
+    with log_path.open("a", encoding="utf-8") as fh:
+        for identifier in processed_ids:
+            fh.write(f"{identifier}\n")
+
+
+def collect_image_dirs(source_root: Path) -> list[Path]:
+    return sorted(
+        [path for path in source_root.rglob("images") if path.is_dir()],
+        key=lambda p: p.as_posix(),
+    )
+
+
+def copy_images(source_dir: Path, dataset_root: Path, starting_index: int) -> tuple[int, int]:
     next_index = starting_index
-    moved = 0
+    copied = 0
 
     for image_path in sorted(source_dir.iterdir(), key=lambda p: p.as_posix()):
         if not image_path.is_file():
@@ -40,18 +58,11 @@ def move_images(source_dir: Path, dataset_root: Path, starting_index: int) -> tu
             next_index += 1
             target = dataset_root / f"{next_index:0{DIGIT_WIDTH}d}{PNG_SUFFIX}"
 
-        shutil.move(str(image_path), str(target))
+        shutil.copy2(image_path, target)
         next_index += 1
-        moved += 1
+        copied += 1
 
-    # Remove the source directory if it is now empty and not the dataset root itself.
-    if moved > 0:
-        try:
-            source_dir.rmdir()
-        except OSError:
-            pass
-
-    return next_index, moved
+    return next_index, copied
 
 
 def main() -> None:
@@ -64,31 +75,38 @@ def main() -> None:
 
     dataset_root.mkdir(parents=True, exist_ok=True)
 
-    sources = collect_source_dirs(source_root, dataset_root)
+    processed = load_processed(dataset_root)
+    sources = collect_image_dirs(source_root)
     if not sources:
         print("No new images directories found.")
         return
 
     next_index = find_next_index(dataset_root)
-    total_moved = 0
+    total_copied = 0
+    newly_processed: list[str] = []
 
     for source_dir in sources:
-        if source_dir == dataset_root:
+        source_id = str(source_dir.resolve())
+        if source_id in processed:
             continue
 
-        next_index, moved = move_images(source_dir, dataset_root, next_index)
-        if moved == 0:
+        next_index, copied = copy_images(source_dir, dataset_root, next_index)
+        if copied == 0:
             continue
 
         rel_dir = source_dir.relative_to(project_root)
-        print(f"Moved {moved} PNG files from {rel_dir}")
-        total_moved += moved
+        print(f"Copied {copied} PNG files from {rel_dir}")
+        total_copied += copied
+        processed.add(source_id)
+        newly_processed.append(source_id)
 
-    if total_moved == 0:
+    append_processed(dataset_root, newly_processed)
+
+    if total_copied == 0:
         print("No new images directories found.")
     else:
         rel_dataset = dataset_root.relative_to(project_root)
-        print(f"Moved {total_moved} PNG files into {rel_dataset}.")
+        print(f"Copied {total_copied} PNG files into {rel_dataset}.")
 
 
 if __name__ == "__main__":

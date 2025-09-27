@@ -27,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Convert STL files to PNGs using tovoxel.convert_file",
     )
-    default_jobs = 8
+    default_jobs = 64
     parser.add_argument(
         "targets",
         nargs="*",
